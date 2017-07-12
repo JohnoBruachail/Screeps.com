@@ -18,9 +18,7 @@ module.exports = {
         // if creep is supposed to repair something
         if (creep.memory.maintaining == true) {
             // find all walls in the room
-            var walls = creep.room.find(FIND_STRUCTURES, {
-                filter: (s) => s.structureType == STRUCTURE_WALL
-            });
+            var walls = creep.room.find(FIND_STRUCTURES, {filter: (s) => s.structureType == STRUCTURE_WALL});
 
             var target = undefined;
 
@@ -57,7 +55,7 @@ module.exports = {
         }
         // if creep is supposed to get energy
         else {
-            creep.getEnergy(true, true, false);
+            creep.getEnergy(true, true, false, false);
         }
     }
 };

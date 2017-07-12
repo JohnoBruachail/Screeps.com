@@ -23,6 +23,7 @@ module.exports.loop = function () {
         }
     }
 
+    //Game.creeps['Zoe'].suicide();
 
 
 //*********************************************************************************************************************************************************************//
@@ -54,7 +55,9 @@ module.exports.loop = function () {
 
     // for each spawn
     for (let spawnName in Game.spawns) {
-        // run spawn logic
-        Game.spawns[spawnName].spawnCreepsIfNecessary();
+        if(Game.spawns[spawnName].spawning == null) {
+            // run spawn logic
+            Game.spawns[spawnName].spawnCreepsIfNecessary();
+        }
     }
 };

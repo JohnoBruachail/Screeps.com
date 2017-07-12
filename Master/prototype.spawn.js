@@ -1,14 +1,22 @@
-var listOfRoles = ['harvester', 'upgrader', 'builder', 'maintainer', 'wallMaintainer', 'outpostHarvester', 'claimer', 'miner', 'scavenger', 'transport', 'defender', 'attacker' ];
-var listOfGlobalRoles = ['outpostHarvester', 'outpostMiner', 'outpostReserver', 'outpostTransport', 'attacker' ];
+require('prototype.spawnCreepDesigns');
+
+
+var listOfEconomicRoles = ['harvester', 'miner', 'transport', 'storageManager', 'baseTurretSupplier'];
+var listOfRoles = [ 'upgrader', 'builder', 'maintainer', 'wallMaintainer', 'scavenger'];
+var listOfMilitaryRoles = [ 'defender' ];
+
+var listOfGlobalEconomicRoles = ['outpostHarvester', 'outpostMiner', 'outpostTransport' ];
+var listOfGlobalRoles = [ 'claimer', 'outpostReserver', 'outpostBuilder' ];
+var listOfGlobalMilitaryRoles = ['attacker', 'rangedAttacker', 'zombie', 'outpostDefender', 'medic'];
+
 var currentEnergy, numberOfContainers, sources, numberOfSources;
 
-//Game.spawns.Core.memory.Creeps = { harvester: 1, transport_Multiplier: 1, builder: 2, maintainer: 2, scavenger: 1, wallMaintainer: 1, upgrader: 1, defender: 1 }
-//Game.spawns.Core.memory.Claim_Room = { room: 0 }
-//Game.spawns.Core.memory.Outpost_Harvesters = { room: 0, numberOfHarvesters: 0 }
-//Game.spawns.Core.memory.Outpost_Builders = { room: 0, numberOfBuilders: 0 }
-//Game.spawns.Core.memory.Outpost_Miners = { room_One: 0, room_Two: 0}
-//Game.spawns.Core.memory.Reservers = { room_One: 0, room_One_Number_Of_Reservers: 0, room_Two: 0, room_Two_Number_Of_Reservers: 0, room_Three: 0, room_Three_Number_Of_Reservers: 0 }
-//Game.spawns.Core.memory.Attackers = { room: 0, numberOfAttackers: 0 }
+//Game.spawns.Core.memory.BaseCreeps = { harvester: 0, transport_Multiplier: 2, builder: 1, maintainer: 2, storageManager: 2, scavenger: 0, wallMaintainer: 1, upgrader: 4, defender: 2 }
+//Game.spawns.Core.memory.Outpost_One_Creeps = { Room: 0, Outpost_Harvesters: 0, Outpost_Builders: 1, Outpost_Miners: 1, Outpost_Transport_Multiplier: 4, Outpost_Reservers: 2, Outpost_Defenders: 1 }
+//Game.spawns.Core.memory.Outpost_Two_Creeps = { Room: 0, Outpost_Harvesters: 0, Outpost_Builders: 1, Outpost_Miners: 1, Outpost_Transport_Multiplier: 4, Outpost_Reservers: 2, Outpost_Defenders: 1 }
+//Game.spawns.Core.memory.Military = { Room: 0, Attackers: 0, RangedAttackers:0, Medics: 0 }
+//Game.spawns.Core.memory.Hoard = { Room: 0, Zombies: 0}
+//Game.spawns.Core.memory.Expansion = {Room: 0, Reserver: 0, Claimer: 0, Builder: 0, Defender: 0}
 
 // create a new function for StructureSpawn
 StructureSpawn.prototype.spawnCreepsIfNecessary =
@@ -23,37 +31,76 @@ StructureSpawn.prototype.spawnCreepsIfNecessary =
         // _.sum will count the number of properties in Game.creeps filtered by the
         //  arrow function, which checks for the creep being a specific role
         /** @type {Object.<string, number>} */
+        let numberOfEconomicCreeps = {};
         let numberOfCreeps = {};
+        let numberOfMilitaryCreeps = {};
+
+        let numberOfGlobalEconomicCreeps = {};
         let numberOfGlobalCreeps = {};
+        let numberOfGlobalMilitaryCreeps = {};
+
+        for (let role of listOfEconomicRoles) {
+            numberOfEconomicCreeps[role] = _.sum(creepsInRoom, (c) => c.memory.role == role);
+        }
         for (let role of listOfRoles) {
             numberOfCreeps[role] = _.sum(creepsInRoom, (c) => c.memory.role == role);
         }
+        for (let role of listOfMilitaryRoles) {
+            numberOfMilitaryCreeps[role] = _.sum(creepsInRoom, (c) => c.memory.role == role);
+        }
+
+        for (let role of listOfGlobalEconomicRoles) {
+            numberOfGlobalEconomicCreeps[role] = _.sum(Game.creeps, (c) => c.memory.role == role && c.memory.homeRoom == room.name);
+        }
         for (let role of listOfGlobalRoles) {
-            numberOfGlobalCreeps[role] = _.sum(Game.creeps, (c) => c.memory.role == role);
+            numberOfGlobalCreeps[role] = _.sum(Game.creeps, (c) => c.memory.role == role && c.memory.homeRoom == room.name);
+        }
+        for (let role of listOfGlobalMilitaryRoles) {
+            numberOfGlobalMilitaryCreeps[role] = _.sum(Game.creeps, (c) => c.memory.role == role && c.memory.homeRoom == room.name);
         }
 
         let maxEnergy = room.energyCapacityAvailable;
         currentEnergy = room.energyAvailable;
         let name = undefined;
 
+        numberOfContainers = room.find(FIND_STRUCTURES, {filter: (s) => s.structureType == STRUCTURE_CONTAINER}).length;
+        numberOfSources = room.find(FIND_SOURCES).length;
 
         //STARTER OR EMERGENCY SPAWNING
-        //if we have no harvesters and no miners make a harvester
-        if(numberOfCreeps['miner'] == 0 && numberOfContainers == 0 && this.room.controller.level == 1){
-            if(numberOfCreeps['harvester'] < 2){
-                name = this.createCustomCreep(300, this.room.name, 'harvester');
+
+        if(this.room.controller.level == 1){
+            if(numberOfEconomicCreeps['harvester'] < 2){
+                name = this.createCustomCreep(300, room.name, room.name, 'harvester');
                 console.log('Spawning a starter harvester: ' + name);
             }
             else if(numberOfCreeps['upgrader'] < 2){
-              name = this.createCustomCreep(maxEnergy, this.room.name, 'upgrader');
+              name = this.createCustomCreep(maxEnergy, room.name, room.name, 'upgrader');
               console.log('Spawning a starter upgrader: ' + name);
             }
-            else if(numberOfCreeps['builder'] < 1){
-              name = this.createCustomCreep(maxEnergy, this.room.name, 'builder');
+            else if(numberOfCreeps['builder'] < 2){
+              name = this.createCustomCreep(maxEnergy, room.name, room.name, 'builder');
               console.log('Spawning a starter builder: ' + name);
             }
             else if(numberOfCreeps['maintainer'] < 1){
-              name = this.createCustomCreep(maxEnergy, this.room.name, 'builder');
+              name = this.createCustomCreep(maxEnergy, room.name, room.name, 'maintainer');
+              console.log('Spawning a starter maintainer: ' + name);
+            }
+        }
+        if(this.room.controller.level == 2){
+            if(numberOfEconomicCreeps['harvester'] < 1){
+                name = this.createCustomCreep(300, room.name, room.name, 'harvester');
+                console.log('Spawning a starter harvester: ' + name);
+            }
+            else if(numberOfCreeps['upgrader'] < 1){
+              name = this.createCustomCreep(maxEnergy, room.name, room.name, 'upgrader');
+              console.log('Spawning a starter upgrader: ' + name);
+            }
+            else if(numberOfCreeps['builder'] < 1){
+              name = this.createCustomCreep(maxEnergy, room.name, room.name, 'builder');
+              console.log('Spawning a starter builder: ' + name);
+            }
+            else if(numberOfCreeps['maintainer'] < 1){
+              name = this.createCustomCreep(maxEnergy, room.name, room.name, 'maintainer');
               console.log('Spawning a starter maintainer: ' + name);
             }
         }
@@ -70,107 +117,212 @@ StructureSpawn.prototype.spawnCreepsIfNecessary =
                     let containers = source.pos.findInRange(FIND_STRUCTURES, 1, { filter: s => s.structureType == STRUCTURE_CONTAINER});
                     // if there is a container next to the source
                     if (containers.length > 0) {
-                        if (maxEnergy >= 550){
-                            // spawn a miner
-                            name = this.createMiner(source.id);
-                            console.log('Spawning a new miner: ' + name);
-                            break;
-                        }
-                        else{
-                            name = this.createCustomCreep(maxEnergy, this.room.name, 'miner', source.id);
-                            console.log('Spawning a starer miner: ' + name);
-                        }
+                        name = this.createCustomCreep(maxEnergy, room.name, room.name, 'miner', source.id);
                     }
                 }
             }
 
-            numberOfContainers = room.find(FIND_STRUCTURES, {filter: (s) => s.structureType == STRUCTURE_CONTAINER}).length;
-            numberOfSources = room.find(FIND_SOURCES).length;
+            //if you cant spawn any of the following spawn an emergency harvester
+            if(numberOfEconomicCreeps['miner'] == 0){
+                if(numberOfEconomicCreeps['harvester'] < 2){
+                    name = this.createCustomCreep(300, room.name, room.name, 'harvester');
+                    console.log('SPAWNING AN EMERGENCY HARVESTER!!!: ' + name);
+                }
+            }
 
             if (numberOfContainers < numberOfSources){
 
-                if (numberOfCreeps['builder'] < 2) {
-                    name = this.createCustomCreep(maxEnergy, this.room.name, 'builder');
+                if (numberOfCreeps['builder'] < 1) {
+                    name = this.createCustomCreep(maxEnergy, room.name, room.name, 'builder');
                     //console.log(this.name + " spawned a starter builder creep: " + name);
                 }
                 if (numberOfCreeps['maintainer'] < 1) {
-                    name = this.createCustomCreep(maxEnergy, this.room.name, 'maintainer');
+                    name = this.createCustomCreep(maxEnergy, room.name, room.name, 'maintainer');
                     console.log(this.name + " spawned a starter maintainer creep: " + name);
                 }
             }
 
-            if (numberOfCreeps['transport'] < numberOfCreeps['miner'] * this.memory.Creeps['transport_Multiplier']) {
+            if (this.room.storage != undefined && numberOfEconomicCreeps['storageManager'] < this.memory.BaseCreeps['storageManager']) {
+                name = this.createTransport(300, room.name, 'storageManager');
+                console.log('Spawning a storage manager: ' + name);
+            }
+
+            if (this.room.storage != undefined && numberOfEconomicCreeps['baseTurretSupplier'] < this.memory.BaseCreeps['TurretSupplier']) {
+                name = this.createTransport(300, room.name, 'baseTurretSupplier');
+                console.log('Spawning a turret supplier: ' + name);
+            }
+
+            if (numberOfEconomicCreeps['transport'] < numberOfEconomicCreeps['miner'] * this.memory.BaseCreeps['transport_Multiplier']) {
                 //add scaling to transport
-                name = this.createTransport(150);
+                name = this.createTransport(300, room.name, 'transport');
                 console.log('Spawning a transport: ' + name);
             }
         }
 
-        // var numberOfOutpostHarvesters = _.sum(Game.creeps, (c) => c.memory.role == 'outpostHarvester')
-        // if (numberOfOutpostHarvesters < this.memory.minOutpostHarvesters['E78S9']) {
-        //     name = this.createOutpostHarvester(800, 4, room.name, 'E78S9', 0);
-        //     console.log(this.name + " spawned a new outpost harvester creep: " + name + "for room E78S9");
-        // }
-
-        // var numberOfOutpostBuilders = _.sum(Game.creeps, (c) => c.memory.role == 'outpostBuilder' && c.memory.targetRoom == 'E78S9')
-        // if (numberOfOutpostBuilders < this.memory.minOutpostBuilders['E78S9']) {
-        //     name = this.createCustomCreep(maxEnergy, 'E78S9', 'builder');
-        //     console.log(this.name + " spawned a new outpost builder creep: " + name + "for room E78S9");
-        // }
-
-        // var numberOfAttackers = _.sum(Game.creeps, (c) => c.memory.role == 'attacker')
-        // if (numberOfAttackers < this.memory.minAttackers['E78S9']) {
-        //     name = this.createAttacker('E78S9');
-        //     console.log(this.name + " spawned a new attacker creep: " + name + "for room E78S9");
-        // }
-
-        // var numberOfReservers = _.sum(Game.creeps, (c) => c.memory.role == 'reserver')
-        // if (numberOfReservers < this.memory.minReservers['E78S9']) {
-        //     name = this.createReserver('E78S9');
-        //     console.log(this.name + " spawned a new reserver creep: " + name + "for room E78S9");
-        // }
-
 //*********************************************************************************************************************************************************************//
 //*********************************************************************************************************************************************************************//
 //*********************************************************************************************************************************************************************//
 
-        // if none of the above caused a spawn command check for other roles
+        // if none of the above were triggered then check economic creeps
         if (name == undefined) {
-            for (let role of listOfRoles) {
-                // check for claim order
-                if (role == 'claimer' && this.memory.Claim_Room != undefined) {
-                    // try to spawn a claimer
-                    name = this.createClaimer(this.memory.claimRoom);
-                    // if that worked
-                    if (name != undefined && _.isString(name)) {
-                        // delete the claim order
-                        delete this.memory.claimRoom;
+
+            // Check if i'm missing economic creeps and create them if missing them
+            for (let role of listOfEconomicRoles) {
+
+                // if no claim order was found, check other roles
+                if (numberOfEconomicCreeps[role] < this.memory.BaseCreeps[role]) {
+                    if(role == 'harvester'){
+                        name = this.createCustomCreep(maxEnergy, room.name, room.name, 'harvester');
                     }
                 }
-                // if no claim order was found, check other roles
-                else if (numberOfCreeps[role] < this.memory.Creeps[role]) {
-                    if(role == 'builder'){
-                        name = this.createCustomCreep(maxEnergy, this.room.name, 'builder');
+            }
+        }
+
+        if (name == undefined) {
+            for (let role of listOfGlobalMilitaryRoles) {
+                if (role == 'outpostDefender'){
+                    if (_.sum(Game.creeps, (c) => c.memory.role == 'outpostDefender' && c.memory.targetRoom == this.memory.Outpost_One_Creeps['Room']) < this.memory.Outpost_One_Creeps['Outpost_Defenders'] && this.memory.Outpost_One_Creeps['Room'] != 0){
+                        name = this.createOutpostDefender(maxEnergy, room.name, this.memory.Outpost_One_Creeps['Room']);
                     }
-                    else if(role == 'defender'){
-                        name = this.createDefender();
+                    else if (_.sum(Game.creeps, (c) => c.memory.role == 'outpostDefender' && c.memory.targetRoom == this.memory.Outpost_Two_Creeps['Room']) < this.memory.Outpost_Two_Creeps['Outpost_Defenders'] && this.memory.Outpost_Two_Creeps['Room'] != 0){
+                        name = this.createOutpostDefender(maxEnergy, room.name, this.memory.Outpost_Two_Creeps['Room']);
                     }
-                    else if(role == 'harvester'){
-                        name = this.createCustomCreep(maxEnergy, this.room.name, 'harvester');
+                    else if (_.sum(Game.creeps, (c) => c.memory.role == 'outpostDefender' && c.memory.targetRoom == this.memory.Expansion['Room']) < this.memory.Expansion['Defenders'] && this.memory.Expansion['Room'] != 0){
+                        name = this.createOutpostDefender(maxEnergy, room.name, this.memory.Expansion['Room']);
                     }
-                    else if(role == 'scavenger'){
-                         name = this.createScavenger();
+                }
+            }
+        }
+
+        if (name == undefined) {
+            for (let role of listOfGlobalEconomicRoles) {
+
+                if (role == 'outpostHarvester'){
+                    if (_.sum(Game.creeps, (c) => c.memory.role == 'outpostHarvester' && c.memory.targetRoom == this.memory.Outpost_One_Creeps['Room']) < this.memory.Outpost_One_Creeps['Outpost_Harvesters'] && this.memory.Outpost_One_Creeps['Room'] != 0){
+                        name = this.createOutpostHarvester(maxEnergy, room.name, this.memory.Outpost_One_Creeps['Room'], 0);
                     }
-                    else if (role == 'maintainer'){
-                        name = this.createCustomCreep(maxEnergy, this.room.name, 'maintainer');
+                    else if (_.sum(Game.creeps, (c) => c.memory.role == 'outpostHarvester' && c.memory.targetRoom == this.memory.Outpost_Two_Creeps['Room']) < this.memory.Outpost_Two_Creeps['Outpost_Harvesters'] && this.memory.Outpost_Two_Creeps['Room'] != 0){
+                        name = this.createOutpostHarvester(maxEnergy, room.name, this.memory.Outpost_Two_Creeps['Room'], 0);
                     }
-                    else if(role == 'upgrader'){
-                        name = this.createCustomCreep(maxEnergy, this.room.name, 'upgrader');
+                }
+                else if (role == 'outpostMiner'){
+                    if (_.sum(Game.creeps, (c) => c.memory.role == 'outpostMiner' && c.memory.targetRoom == this.memory.Outpost_One_Creeps['Room']) < this.memory.Outpost_One_Creeps['Outpost_Miners'] && this.memory.Outpost_One_Creeps['Room'] != 0){
+                        name = this.createOutpostMiner(maxEnergy, room.name, this.memory.Outpost_One_Creeps['Room']);
                     }
-                    else if (role == 'wallMaintainer'){
-                        name = this.createWallMaintainer();
+                    else if (_.sum(Game.creeps, (c) => c.memory.role == 'outpostMiner' && c.memory.targetRoom == this.memory.Outpost_Two_Creeps['Room']) < this.memory.Outpost_Two_Creeps['Outpost_Miners'] && this.memory.Outpost_Two_Creeps['Room'] != 0){
+                        name = this.createOutpostMiner(maxEnergy, room.name, this.memory.Outpost_Two_Creeps['Room']);
                     }
-                    break;
+                }
+                else if (role == 'outpostTransport'){
+                    if (_.sum(Game.creeps, (c) => c.memory.role == 'outpostTransport' && c.memory.targetRoom == this.memory.Outpost_One_Creeps['Room']) < (_.sum(Game.creeps, (c) => c.memory.role == 'outpostMiner' && c.memory.targetRoom == this.memory.Outpost_One_Creeps['Room'])) * this.memory.Outpost_One_Creeps['Outpost_Transport_Multiplier'] && this.memory.Outpost_One_Creeps['Room'] != 0){
+                        name = this.createOutpostTransport(550, room.name, this.memory.Outpost_One_Creeps['Room'] );
+                    }
+                    else if (_.sum(Game.creeps, (c) => c.memory.role == 'outpostTransport' && c.memory.targetRoom == this.memory.Outpost_Two_Creeps['Room']) < (_.sum(Game.creeps, (c) => c.memory.role == 'outpostMiner' && c.memory.targetRoom == this.memory.Outpost_Two_Creeps['Room'])) * this.memory.Outpost_Two_Creeps['Outpost_Transport_Multiplier'] && this.memory.Outpost_Two_Creeps['Room'] != 0){
+                        name = this.createOutpostTransport(550, room.name, this.memory.Outpost_Two_Creeps['Room'] );
+                    }
+                }
+            }
+        }
+
+        for (let role of listOfRoles) {
+
+            // if no claim order was found, check other roles
+            if (numberOfCreeps[role] < this.memory.BaseCreeps[role]) {
+                if(role == 'builder'){
+                    name = this.createCustomCreep(maxEnergy, room.name, room.name, 'builder');
+                }
+                else if(role == 'scavenger'){
+                     name = this.createScavenger();
+                }
+                else if (role == 'maintainer'){
+                    name = this.createCustomCreep(maxEnergy, room.name, room.name, 'maintainer');
+                }
+                else if(role == 'upgrader'){
+                    name = this.createCustomCreep(maxEnergy, room.name, room.name, 'upgrader');
+                }
+                else if (role == 'wallMaintainer'){
+                    name = this.createCustomCreep(maxEnergy, room.name, room.name, 'wallMaintainer');
+                }
+                break;
+            }
+        }
+        if (name == undefined) {
+            // Check if i'm missing economic creeps and create them if missing them
+            for (let role of listOfMilitaryRoles) {
+                if(this.room.find(FIND_HOSTILE_CREEPS).length > 0){
+
+                    if (numberOfMilitaryCreeps[role] < this.memory.BaseCreeps[role]) {
+                        if(role == 'defender'){
+                            name = this.createDefender(currentEnergy, room.name);
+                            console.log('Hostiles Detected, Spawning Defenders');
+                        }
+                    }
+                }
+            }
+        }
+
+        if (name == undefined) {
+            for (let role of listOfGlobalMilitaryRoles) {
+                if (role == 'attacker'){
+                    if (numberOfGlobalMilitaryCreeps['attacker'] < this.memory.Military['Attackers'] && this.memory.Military['Room'] != 0){
+                        name = this.createAttacker(maxEnergy, room.name, this.memory.Military['Room']);
+
+                    }
+                }
+                if (role == 'rangedAttacker'){
+                    if (numberOfGlobalMilitaryCreeps['rangedAttacker'] < this.memory.Military['RangedAttackers'] && this.memory.Military['Room'] != 0){
+                        name = this.createRangedAttacker(maxEnergy, room.name, this.memory.Military['Room']);
+
+                    }
+                }
+                if (role == 'zombie'){
+                    if (numberOfGlobalMilitaryCreeps['zombie'] < this.memory.Hoard['Zombies'] && this.memory.Hoard['Room'] != 0){
+                        name = this.createZombie(maxEnergy, room.name, this.memory.Hoard['Room']);
+                    }
+                }
+                if (role == 'medic'){
+                    if (numberOfGlobalMilitaryCreeps['medic'] < this.memory.Military['Medics'] && this.memory.Military['Room'] != 0){
+                        name = this.createMedic(maxEnergy, room.name, this.memory.Military['Room']);
+                    }
+                }
+            }
+        }
+        if(name == undefined){
+            for (let role of listOfGlobalRoles) {
+
+                // check for claim order
+                if (role == 'claimer' && this.memory.Expansion['Claimers'] > 0 && this.memory.Expansion['Room'] != 0 ) {
+                    // try to spawn a claimer
+                    name = this.createClaimer(this.memory.Expansion['Room']);
+                    console.log('made a claimer')
+                    // if that worked
+                    if (name != undefined && _.isString(name)) {
+                        // set the number of claimers to 0, we dont need more
+                        this.memory.Expansion['Claimers'] = 0;
+                    }
+                }
+
+                else if (role == 'outpostReserver'){
+                    if (_.sum(Game.creeps, (c) => c.memory.role == 'outpostReserver' && c.memory.targetRoom == this.memory.Outpost_One_Creeps['Room']) < this.memory.Outpost_One_Creeps['Outpost_Reservers'] && this.memory.Outpost_One_Creeps['Room'] != 0){
+                        name = this.createOutpostReserver(maxEnergy, room.name, this.memory.Outpost_One_Creeps['Room']);
+                    }
+                    else if (_.sum(Game.creeps, (c) => c.memory.role == 'outpostReserver' && c.memory.targetRoom == this.memory.Outpost_Two_Creeps['Room']) < this.memory.Outpost_One_Creeps['Outpost_Reservers'] && this.memory.Outpost_Two_Creeps['Room'] != 0){
+                        name = this.createOutpostReserver(maxEnergy,  room.name, this.memory.Outpost_Two_Creeps['Room']);
+                    }
+                    else if(_.sum(Game.creeps, (c) => c.memory.role == 'outpostReserver' && c.memory.targetRoom == this.memory.Expansion['Room']) < this.memory.Expansion['Reservers'] && this.memory.Expansion['Room'] != 0){
+                        name = this.createOutpostReserver(maxEnergy,  room.name, this.memory.Expansion['Room']);
+                    }
+                }
+                else if (role == 'outpostBuilder'){
+                    if (_.sum(Game.creeps, (c) => c.memory.role == 'outpostBuilder' && c.memory.targetRoom == this.memory.Outpost_One_Creeps['Room']) < this.memory.Outpost_One_Creeps['Outpost_Builders'] && this.memory.Outpost_One_Creeps['Room'] != 0){
+                        name = this.createCustomCreep(maxEnergy,  room.name, this.memory.Outpost_One_Creeps['Room'], 'outpostBuilder');
+                    }
+                    else if (_.sum(Game.creeps, (c) => c.memory.role == 'outpostBuilder' && c.memory.targetRoom == this.memory.Outpost_Two_Creeps['Room']) < this.memory.Outpost_Two_Creeps['Outpost_Builders'] && this.memory.Outpost_Two_Creeps['Room'] != 0){
+                        name = this.createCustomCreep(maxEnergy,  room.name, this.memory.Outpost_Two_Creeps['Room'], 'outpostBuilder');
+                    }
+                    else if (_.sum(Game.creeps, (c) => c.memory.role == 'outpostBuilder' && c.memory.targetRoom == this.memory.Expansion['Room']) < this.memory.Expansion['Builders'] && this.memory.Expansion['Room'] != 0){
+                        name = this.createCustomCreep(maxEnergy,  room.name, this.memory.Expansion['Room'], 'outpostBuilder');
+                    }
                 }
             }
         }
@@ -181,175 +333,26 @@ StructureSpawn.prototype.spawnCreepsIfNecessary =
 
             console.log('****UPDATE****');
             console.log('****Economy****');
-            console.log('Harvesters:        ' + numberOfCreeps['harvester'] + '/' + this.memory.Creeps['harvester']);
-            console.log('Miners:            ' + numberOfCreeps['miner'] + '/' + room.find(FIND_SOURCES).length);
-            console.log('Transports:        ' + numberOfCreeps['transport'] + '/' + numberOfCreeps['miner'] * this.memory.Creeps['transport_Multiplier']);
-            console.log('Outpost Harvester: ' + _.sum(Game.creeps, (c) => c.memory.role == 'outpostHarvester') + '/' + this.memory.Outpost_Harvesters['E78S9']);
+            console.log('Harvesters:          ' + numberOfEconomicCreeps['harvester'] + '/' + this.memory.BaseCreeps['harvester']);
+            console.log('Miners:              ' + numberOfEconomicCreeps['miner'] + '/' + room.find(FIND_SOURCES).length);
+            console.log('Transports:          ' + numberOfEconomicCreeps['transport'] + '/' + numberOfEconomicCreeps['miner'] * this.memory.BaseCreeps['transport_Multiplier']);
             console.log('****Construction****');
-            console.log('Builders:          ' + numberOfCreeps['builder'] + '/' + this.memory.Creeps['builder']);
-            console.log('Maintainers:       ' + numberOfCreeps['maintainer'] + '/' + this.memory.Creeps['maintainer']);
-            console.log('WallMaintainers:   ' + numberOfCreeps['wallMaintainer'] + '/' + this.memory.Creeps['wallMaintainer']);
-            console.log('Upgraders:         ' + numberOfCreeps['upgrader'] + '/' + this.memory.Creeps['upgrader']);
+            console.log('Builders:            ' + numberOfCreeps['builder'] + '/' + this.memory.BaseCreeps['builder']);
+            console.log('Maintainers:         ' + numberOfCreeps['maintainer'] + '/' + this.memory.BaseCreeps['maintainer']);
+            console.log('WallMaintainers:     ' + numberOfCreeps['wallMaintainer'] + '/' + this.memory.BaseCreeps['wallMaintainer']);
+            console.log('Upgraders:           ' + numberOfCreeps['upgrader'] + '/' + this.memory.BaseCreeps['upgrader']);
+            console.log('****Outposts****');
+            console.log('Outpost Builders:    ' + numberOfGlobalCreeps['outpostBuilder']);
+            console.log('Outpost Harvesters:  ' + numberOfGlobalEconomicCreeps['outpostHarvester']);
+            console.log('Outpost Reservers:   ' + numberOfGlobalCreeps['outpostReserver']);
+            console.log('Outpost Miners:      ' + numberOfGlobalEconomicCreeps['outpostMiner'] + '/' + (this.memory.Outpost_One_Creeps['Outpost_Miners'] + this.memory.Outpost_Two_Creeps['Outpost_Miners']));
+            console.log('Outpost Transports:  ' + numberOfGlobalEconomicCreeps['outpostTransport'] + '/' + ((_.sum(Game.creeps, (c) => c.memory.role == 'outpostMiner' && c.memory.targetRoom == this.memory.Outpost_One_Creeps['Room']) * this.memory.Outpost_One_Creeps['Outpost_Transport_Multiplier']) + (_.sum(Game.creeps, (c) => c.memory.role == 'outpostMiner' && c.memory.targetRoom == this.memory.Outpost_Two_Creeps['Room']) * this.memory.Outpost_Two_Creeps['Outpost_Transport_Multiplier'])))
             console.log('****Military****');
-            console.log('Claimers:          ' + numberOfCreeps['claimer'] + '/' + this.memory.Creeps['claimer']);
-            console.log('Defenders:         ' + numberOfCreeps['defender'] + '/' + this.memory.Creeps['defender']);
-            console.log('Attackers:         ' + _.sum(Game.creeps, (c) => c.memory.role == 'attacker') + '/' + this.memory.Attackers['E78S9']);
-            console.log('Reservers:         ' + _.sum(Game.creeps, (c) => c.memory.role == 'reserver') + '/' + this.memory.Reservers['E78S9']);
+            console.log('Claimers:            ' + numberOfGlobalCreeps['claimer']);
+            console.log('Attackers:           ' + numberOfGlobalMilitaryCreeps['attacker'] + '/' + this.memory.Military['Attackers']);
+            console.log('Defenders:           ' + numberOfMilitaryCreeps['defender'] + '/' + this.memory.BaseCreeps['defender']);
+            console.log('Outpost Defenders:   ' + numberOfGlobalMilitaryCreeps['outpostDefender'] + '/' + (this.memory.Outpost_One_Creeps['Outpost_Defenders'] + this.memory.Outpost_Two_Creeps['Outpost_Defenders']));
             console.log('**************');
 
         }
-    };
-
-//*********************************************************************************************************************************************************************//
-//*********************************************************************************************************************************************************************//
-//*********************************************************************************************************************************************************************//
-
-
-// spawn a custom creep
-StructureSpawn.prototype.createCustomCreep =
-    function (energy, targetRoom, roleName, sourceId) {
-
-        if(roleName == 'miner'){
-            let body = [];
-            while(energy > 150){
-                body.push(WORK);
-                energy =- 100;
-            }
-            body.push(MOVE);
-            return this.createCreep(body, undefined, { role: roleName, targetRoom: targetRoom, working: false, sourceId: sourceId });
-        }
-
-          //LOOP AND ADD COMPONENTS, CHECK IF OVER ENERGY CAP, IF NOT LOOP AGAIN.
-
-        if(roleName == 'builder' || roleName == 'harvester' || roleName == 'maintainer' || roleName == 'upgrader'){
-            // create a balanced body as big as possible with the given energy
-            let numberOfParts = Math.floor(energy / 200);
-            // make sure the creep is not too big (more than 50 parts)
-            numberOfParts = Math.min(numberOfParts, Math.floor(50 / 3));
-            let body = [];
-            for (let i = 0; i < numberOfParts; i++) {
-                body.push(WORK);
-            }
-            for (let i = 0; i < numberOfParts; i++) {
-                body.push(CARRY);
-            }
-            for (let i = 0; i < numberOfParts; i++) {
-                body.push(MOVE);
-            }
-            // create creep with the created body and the given role
-            return this.createCreep(body, undefined, { role: roleName, targetRoom: targetRoom, working: false });
-        }
-
-        // if(roleName == defender){
-        //
-        //   var numberOfToughParts = 0, numberOfAttackParts = 0, numberOfMoveParts = 0;
-        //
-        //   while(energy > 0){
-        //
-        //       numberOfToughParts =+ 2;
-        //       numberOfAttackParts =+ 2;
-        //       numberOfMoveParts =+ 2;
-        //
-        //   }
-        //
-        //   var body = [];
-        //   for (let i = 0; i < numberOfToughParts; i++) {
-        //       body.push(TOUGH);
-        //   }
-        //   for (let i = 0; i < numberOfToughParts; i++) {
-        //       body.push(TOUGH);
-        //   }
-        //   for (let i = 0; i < numberOfToughParts; i++) {
-        //       body.push(TOUGH);
-        //   }
-        //
-        // }
-    };
-
-
-// spawn an outpost harvester
-StructureSpawn.prototype.createOutpostHarvester =
-    function (energy, numberOfWorkParts, home, targetRoom, sourceIndex) {
-        // create a body with the specified number of WORK parts and one MOVE part per non-MOVE part
-        let body = [];
-        for (let i = 0; i < numberOfWorkParts; i++) {
-            body.push(WORK);
-        }
-
-        // 150 = 100 (cost of WORK) + 50 (cost of MOVE)
-        energy -= 150 * numberOfWorkParts;
-
-        let numberOfParts = Math.floor(energy / 100);
-        // make sure the creep is not too big (more than 50 parts)
-        numberOfParts = Math.min(numberOfParts, Math.floor((50 - numberOfWorkParts * 2) / 2));
-        for (let i = 0; i < numberOfParts; i++) {
-            body.push(CARRY);
-        }
-        for (let i = 0; i < numberOfParts + numberOfWorkParts; i++) {
-            body.push(MOVE);
-        }
-
-        //quick fix to make outpost harvester correct build
-        body = [WORK,WORK,WORK,WORK,CARRY,CARRY,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE];
-        // create creep with the created body
-        return this.createCreep(body, undefined, { role: 'outpostHarvester', home: home, targetRoom: targetRoom, sourceIndex: sourceIndex, harvesting: false });
-    };
-
-// spawn a claimer
-StructureSpawn.prototype.createClaimer =
-    function (targetRoom) {
-        return this.createCreep([CLAIM,MOVE], undefined, { role: 'claimer', targetRoom: targetRoom, claiming: false });
-    };
-
-// spawn a reserver
-StructureSpawn.prototype.createReserver =
-    function (targetRoom) {
-        return this.createCreep([CLAIM,MOVE], undefined, { role: 'reserver', targetRoom: targetRoom, reserving: false });
-    };
-
-// spawn a miner
-StructureSpawn.prototype.createMiner =
-    function (sourceId) {
-        return this.createCreep([WORK, WORK, WORK, WORK, WORK, MOVE], undefined,{ role: 'miner', sourceId: sourceId });
-    };
-
-StructureSpawn.prototype.createScavenger =
-    function () {
-            return this.createCreep([CARRY, CARRY, CARRY, MOVE, MOVE, MOVE], undefined,{ role: 'scavenger', scavenging: false});
-    };
-
-// spawn a wall maintainer
-StructureSpawn.prototype.createWallMaintainer =
-      function () {
-          return this.createCreep([WORK,WORK,WORK,CARRY,CARRY,CARRY,MOVE,MOVE], undefined, {role: 'wallMaintainer', maintaining: false});
-      };
-
-// spawn a defender
-StructureSpawn.prototype.createDefender =
-        function () {
-            return this.createCreep([TOUGH,MOVE,ATTACK,ATTACK,MOVE], undefined, {role: 'defender', defending: false});
-        };
-
-// spawn an attacker
-StructureSpawn.prototype.createAttacker =
-        function (targetRoom) {
-            return this.createCreep([TOUGH,TOUGH,TOUGH,MOVE,MOVE,MOVE,ATTACK,ATTACK,MOVE], undefined, {role: 'attacker', targetRoom: targetRoom, attacking: false});
-        };
-
-// spawn a transport
-StructureSpawn.prototype.createTransport =
-    function (energy) {
-        // create a body with twice as many CARRY as MOVE parts
-        var numberOfParts = Math.floor(energy / 150);
-        // make sure the creep is not too big (more than 50 parts)
-        numberOfParts = Math.min(numberOfParts, Math.floor(50 / 3));
-        var body = [];
-        for (let i = 0; i < numberOfParts * 2; i++) {
-            body.push(CARRY);
-        }
-        for (let i = 0; i < numberOfParts; i++) {
-            body.push(MOVE);
-        }
-        // create creep with the created body and the role 'transport'
-        return this.createCreep(body, undefined, { role: 'transport', transporting: false });
     };
